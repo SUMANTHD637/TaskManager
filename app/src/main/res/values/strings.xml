@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">TaskFlow</string>
+    <string name="tasks">Tasks</string>
+    <string name="notes">Notes</string>
+    <string name="add_task">Add Task</string>
+    <string name="add_note">Add Note</string>
+    <string name="title">Title</string>
+    <string name="description">Description</string>
+    <string name="content">Content</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="no_tasks">No tasks yet</string>
+    <string name="no_notes">No notes yet</string>
+</resources>
