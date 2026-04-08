@@ -21,7 +21,7 @@ import androidx.navigation.compose.rememberNavController
 import com.taskflow.ui.screens.AddNoteScreen
 import com.taskflow.ui.screens.AddTaskScreen
 import com.taskflow.ui.screens.NotesScreen
-import com.taskflow.ui.screens.TasksScreen
+import com.taskflow.ui.screens.TaskScreen
 import com.taskflow.viewmodel.NoteViewModel
 import com.taskflow.viewmodel.TaskViewModel
 
@@ -84,12 +84,9 @@ fun TaskFlowApp(
             startDestination = NavigationItem.Tasks.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            // ✅ NEW INTEGRATED SCREEN WITH DIALOG & DATABASE
             composable(NavigationItem.Tasks.route) {
-                TasksScreen(
-                    viewModel = taskViewModel,
-                    onAddTaskClick = { navController.navigate(NavigationItem.AddTask.route) },
-                    onTaskClick = { }
-                )
+                TaskScreen(viewModel = taskViewModel)
             }
 
             composable(NavigationItem.Notes.route) {
@@ -100,12 +97,6 @@ fun TaskFlowApp(
                 )
             }
 
-            composable(NavigationItem.AddTask.route) {
-                AddTaskScreen(
-                    viewModel = taskViewModel,
-                    onBackClick = { navController.popBackStack() }
-                )
-            }
 
             composable(NavigationItem.AddNote.route) {
                 AddNoteScreen(
