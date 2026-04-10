@@ -11,12 +11,14 @@ object DatabaseProvider {
     private var database: TaskFlowDatabase? = null
 
     fun getDatabase(context: Context): TaskFlowDatabase {
-        return database ?: run {
+        return database ?: synchronized(this) {
             val instance = Room.databaseBuilder(
                 context.applicationContext,
                 TaskFlowDatabase::class.java,
                 "taskflow_database"
-            ).build()
+            )
+            .fallbackToDestructiveMigration()
+            .build()
             database = instance
             instance
         }

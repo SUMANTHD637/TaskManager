@@ -27,11 +27,11 @@ import com.taskflow.data.entities.TaskEntity
 import com.taskflow.viewmodel.TaskViewModel
 import java.util.*
 
-// ✅ ENHANCED DATA CLASS - Map TaskEntity to UI Model
+// ======================== UI MODEL ========================
 data class Task(
     val id: Int,
     val title: String,
-    val type: String, // "Habit" or "Task"
+    val type: String,
     val color: Color,
     val isCompleted: Boolean = false
 ) {
@@ -48,17 +48,62 @@ data class Task(
     }
 }
 
+// ======================== DATE HELPERS ========================
+data class DayInfo(
+    val dayName: String,
+    val dayNum: Int,
+    val month: Int,
+    val year: Int,
+    val isToday: Boolean
+)
+
+fun getWeekDays(): List<DayInfo> {
+    val calendar = Calendar.getInstance()
+    val todayDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+    val daysFromMonday = (todayDayOfWeek - Calendar.MONDAY + 7) % 7
+    calendar.add(Calendar.DAY_OF_YEAR, -daysFromMonday)
+
+    val today = Calendar.getInstance()
+    val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+    return (0..6).map { i ->
+        val isToday = calendar.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+                && calendar.get(Calendar.YEAR) == today.get(Calendar.YEAR)
+        val info = DayInfo(
+            dayName = dayNames[i],
+            dayNum = calendar.get(Calendar.DAY_OF_MONTH),
+            month = calendar.get(Calendar.MONTH) + 1,
+            year = calendar.get(Calendar.YEAR),
+            isToday = isToday
+        )
+        calendar.add(Calendar.DAY_OF_YEAR, 1)
+        info
+    }
+}
+
+fun getTodayIndex(): Int {
+    val calendar = Calendar.getInstance()
+    val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+    return (dayOfWeek - Calendar.MONDAY + 7) % 7
+}
+
+fun getMonthName(month: Int): String {
+    return listOf(
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    )[month - 1]
+}
+
 // ======================== MAIN SCREEN ========================
 @Composable
 fun TaskScreen(viewModel: TaskViewModel) {
     var showAddTaskDialog by remember { mutableStateOf(false) }
-    var selectedDate by remember { mutableStateOf(getTodayIndex()) }
+    val weekDays = remember { getWeekDays() }
+    var selectedIndex by remember { mutableStateOf(getTodayIndex()) }
+    val selectedDay = weekDays[selectedIndex]
 
-    // Observe tasks from ViewModel
     val incompleteTasks by viewModel.incompleteTasks.collectAsState()
     val completedTasks by viewModel.completedTasks.collectAsState()
-
-    // Convert TaskEntity to UI Task
     val uiTasks = (incompleteTasks + completedTasks).map { Task.fromEntity(it) }
 
     Scaffold(
@@ -70,7 +115,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 Icon(Icons.Default.Add, contentDescription = "Add Task", tint = Color.White)
             }
         },
-
         containerColor = Color.Black
     ) { padding ->
         Column(
@@ -79,28 +123,19 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            TopBar()
+            TopBar(selectedDay)
             Spacer(modifier = Modifier.height(16.dp))
-
-            DateRow(selectedDate) { selectedDate = it }
+            DateRow(weekDays = weekDays, selectedIndex = selectedIndex, onDateSelect = { selectedIndex = it })
             Spacer(modifier = Modifier.height(16.dp))
-
-            TaskList(uiTasks) { taskId, isCompleted ->
-                viewModel.markTaskComplete(taskId, isCompleted)
-            }
+            TaskList(uiTasks) { taskId, isCompleted -> viewModel.markTaskComplete(taskId, isCompleted) }
         }
     }
 
-    // ✅ ADD TASK DIALOG
     if (showAddTaskDialog) {
         AddTaskDialog(
             onDismiss = { showAddTaskDialog = false },
             onAddTask = { title, isHabit ->
-                viewModel.addTask(
-                    title = title,
-                    isHabit = isHabit,
-                    habitFrequency = if (isHabit) "daily" else ""
-                )
+                viewModel.addTask(title = title, isHabit = isHabit, habitFrequency = if (isHabit) "daily" else "")
                 showAddTaskDialog = false
             }
         )
@@ -109,19 +144,26 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
 // ======================== TOP BAR ========================
 @Composable
-fun TopBar() {
+fun TopBar(selectedDay: DayInfo) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(Icons.Default.Menu, contentDescription = null, tint = Color.White)
         Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = "Today",
-            color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Column {
+            Text(
+                text = if (selectedDay.isToday) "Today" else "${selectedDay.dayName}, ${selectedDay.dayNum}",
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "${getMonthName(selectedDay.month)} ${selectedDay.year}",
+                color = Color.Gray,
+                fontSize = 13.sp
+            )
+        }
         Spacer(modifier = Modifier.weight(1f))
         Icon(Icons.Default.Search, contentDescription = null, tint = Color.White)
     }
@@ -129,32 +171,41 @@ fun TopBar() {
 
 // ======================== DATE ROW ========================
 @Composable
-fun DateRow(selectedIndex: Int, onDateSelect: (Int) -> Unit) {
-    val days = listOf("Sat\n4", "Sun\n5", "Mon\n6", "Tue\n7", "Wed\n8")
-
+fun DateRow(weekDays: List<DayInfo>, selectedIndex: Int, onDateSelect: (Int) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        days.forEachIndexed { index, day ->
+        weekDays.forEachIndexed { index, day ->
             val isSelected = index == selectedIndex
-
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
                     .background(
-                        if (isSelected) Color(0xFFE91E63) else Color.DarkGray
+                        when {
+                            isSelected -> Color(0xFFE91E63)
+                            day.isToday -> Color(0xFF3A3A3A)
+                            else -> Color.DarkGray
+                        }
                     )
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = rememberRipple(),
                         onClick = { onDateSelect(index) }
                     )
-                    .padding(12.dp),
+                    .padding(vertical = 10.dp, horizontal = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = day, color = Color.White, fontSize = 12.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = day.dayName, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = day.dayNum.toString(),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
         }
     }
@@ -162,38 +213,21 @@ fun DateRow(selectedIndex: Int, onDateSelect: (Int) -> Unit) {
 
 // ======================== TASK LIST ========================
 @Composable
-fun TaskList(
-    tasks: List<Task>,
-    onTaskComplete: (Int, Boolean) -> Unit
-) {
+fun TaskList(tasks: List<Task>, onTaskComplete: (Int, Boolean) -> Unit) {
     if (tasks.isEmpty()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = "No tasks yet 📋",
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text(text = "No tasks yet 📋", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Tap + to create one",
-                color = Color.Gray,
-                fontSize = 14.sp
-            )
+            Text(text = "Tap + to create one", color = Color.Gray, fontSize = 14.sp)
         }
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(tasks) { task ->
-                TaskItem(
-                    task = task,
-                    onComplete = { onTaskComplete(task.id, it) }
-                )
+                TaskItem(task = task, onComplete = { onTaskComplete(task.id, it) })
             }
         }
     }
@@ -209,7 +243,6 @@ fun TaskItem(task: Task, onComplete: (Boolean) -> Unit) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left icon box
         Box(
             modifier = Modifier
                 .size(50.dp)
@@ -217,29 +250,13 @@ fun TaskItem(task: Task, onComplete: (Boolean) -> Unit) {
                 .background(task.color),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = if (task.type == "Habit") "🔄" else "✓",
-                fontSize = 24.sp
-            )
+            Text(text = if (task.type == "Habit") "🔄" else "✓", fontSize = 24.sp)
         }
-
         Spacer(modifier = Modifier.width(12.dp))
-
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = task.title,
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = task.type,
-                color = Color.Gray,
-                fontSize = 12.sp
-            )
+            Text(text = task.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(text = task.type, color = Color.Gray, fontSize = 12.sp)
         }
-
-        // Right checkbox
         Checkbox(
             checked = task.isCompleted,
             onCheckedChange = { onComplete(it) },
@@ -248,59 +265,34 @@ fun TaskItem(task: Task, onComplete: (Boolean) -> Unit) {
     }
 }
 
-// ======================== BOTTOM BAR ========================
-
-
 // ======================== ADD TASK DIALOG ========================
 @Composable
-fun AddTaskDialog(
-    onDismiss: () -> Unit,
-    onAddTask: (String, Boolean) -> Unit
-) {
+fun AddTaskDialog(onDismiss: () -> Unit, onAddTask: (String, Boolean) -> Unit) {
     var title by remember { mutableStateOf("") }
     var isHabit by remember { mutableStateOf(false) }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .background(Color(0xFF1F1F1F), RoundedCornerShape(16.dp)),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1F1F1F)
-            )
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1F1F1F))
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header
-                Text(
-                    text = "Add New Task",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = "Add New Task", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-                // Title Input
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("Task Title", color = Color.Gray) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF2A2A2A), RoundedCornerShape(8.dp)),
-                    textStyle = LocalTextStyle.current.copy(
-                        color = Color.White
-                    ),
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFF2A2A2A), RoundedCornerShape(8.dp)),
+                    textStyle = LocalTextStyle.current.copy(color = Color.White),
                     singleLine = true
                 )
 
-                // Habit Checkbox
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -308,44 +300,22 @@ fun AddTaskDialog(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
-                        checked = isHabit,
-                        onCheckedChange = { isHabit = it }
-                    )
+                    Checkbox(checked = isHabit, onCheckedChange = { isHabit = it })
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("This is a Habit 🔄", color = Color.White)
                 }
 
-                // Buttons
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Cancel Button
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                    ) {
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(44.dp)) {
                         Text("Cancel", color = Color.White)
                     }
-
-                    // Add Button
                     Button(
-                        onClick = {
-                            if (title.isNotBlank()) {
-                                onAddTask(title, isHabit)
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE91E63)
-                        ),
+                        onClick = { if (title.isNotBlank()) onAddTask(title, isHabit) },
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63)),
                         enabled = title.isNotBlank()
                     ) {
                         Text("Add Task", color = Color.White)
@@ -355,15 +325,3 @@ fun AddTaskDialog(
         }
     }
 }
-
-// ======================== HELPER FUNCTIONS ========================
-fun getTodayIndex(): Int {
-    val calendar = Calendar.getInstance()
-    return (calendar.get(Calendar.DAY_OF_WEEK) - 1) % 7
-}
-
-
-
-
-
-

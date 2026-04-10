@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Black background -->
-    <item android:drawable="@android:color/black"/>
-    <!-- Centered icon -->
+    <!-- Solid black background -->
     <item>
-        <bitmap
-            android:src="@drawable/icon"
-            android:gravity="center"
-            android:tileMode="disabled"/>
+        <shape android:shape="rectangle">
+            <solid android:color="#000000" />
+        </shape>
     </item>
 </layer-list>
